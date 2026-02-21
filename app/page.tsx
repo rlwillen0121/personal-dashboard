@@ -1,7 +1,9 @@
 import { SidebarProvider } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/app-sidebar"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import DailyBrief from "@/components/daily-brief"
+import { AgentStatus } from "@/components/agent-status"
+import { StockTickers } from "@/components/stock-tickers"
+import { DailyTasks } from "@/components/daily-tasks"
 
 export default function Home() {
   return (
@@ -24,33 +26,9 @@ export default function Home() {
 
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
               <DailyBrief />
-              
-              <Card className="shadow-sm">
-                <CardHeader>
-                  <CardTitle className="text-lg">Agent Status</CardTitle>
-                </CardHeader>
-                <CardContent className="h-48 flex items-center justify-center text-muted-foreground italic">
-                  Loading status...
-                </CardContent>
-              </Card>
-
-              <Card className="shadow-sm">
-                <CardHeader>
-                  <CardTitle className="text-lg">Stock Market</CardTitle>
-                </CardHeader>
-                <CardContent className="h-48 flex items-center justify-center text-muted-foreground italic">
-                  Fetching tickers...
-                </CardContent>
-              </Card>
-
-              <Card className="shadow-sm">
-                <CardHeader>
-                  <CardTitle className="text-lg">Daily Tasks</CardTitle>
-                </CardHeader>
-                <CardContent className="h-48 flex items-center justify-center text-muted-foreground italic">
-                  Syncing to-do list...
-                </CardContent>
-              </Card>
+              <AgentStatus />
+              <StockTickers />
+              <DailyTasks />
             </div>
           </div>
         </main>
