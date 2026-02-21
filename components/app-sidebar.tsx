@@ -22,35 +22,46 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
 
+interface AppSidebarProps {
+  onNavigate?: (sectionId: string) => void
+  activeSection?: string
+}
+
 const items = [
   {
     title: "Dashboard",
-    url: "/",
+    section: "",
     icon: LayoutDashboard,
   },
   {
     title: "Daily Brief",
-    url: "#brief",
+    section: "brief",
     icon: Calendar,
   },
   {
     title: "Agent Status",
-    url: "#agents",
+    section: "agents",
     icon: Activity,
   },
   {
     title: "Polymarket",
-    url: "#polymarket",
+    section: "polymarket",
     icon: Wallet,
   },
   {
     title: "Tasks",
-    url: "#tasks",
+    section: "tasks",
     icon: CheckSquare,
   },
 ]
 
-export function AppSidebar() {
+export function AppSidebar({ onNavigate, activeSection }: AppSidebarProps) {
+  const handleNavigate = (section: string) => {
+    if (onNavigate) {
+      onNavigate(section)
+    }
+  }
+
   return (
     <Sidebar className="border-r border-border">
       <SidebarHeader className="p-6 border-b border-border">
@@ -65,11 +76,14 @@ export function AppSidebar() {
             <SidebarMenu className="gap-1">
               {items.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild className="hover:bg-primary/10 hover:text-primary transition-all duration-200 py-6 px-4 rounded-lg group">
-                    <a href={item.url} className="flex items-center gap-3">
-                      <item.icon className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                      <span className="font-semibold text-sm tracking-tight">{item.title}</span>
-                    </a>
+                  <SidebarMenuButton 
+                    onClick={() => handleNavigate(item.section)}
+                    className={`hover:bg-primary/10 hover:text-primary transition-all duration-200 py-6 px-4 rounded-lg group ${
+                      activeSection === item.section ? "bg-primary/10 text-primary" : ""
+                    }`}
+                  >
+                    <item.icon className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                    <span className="font-semibold text-sm tracking-tight">{item.title}</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
