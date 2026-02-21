@@ -2,7 +2,7 @@ import { SidebarProvider } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/app-sidebar"
 import DailyBrief from "@/components/daily-brief"
 import { AgentStatus } from "@/components/agent-status"
-import { StockTickers } from "@/components/stock-tickers"
+import { PolymarketPrices } from "@/components/polymarket-prices"
 import { DailyTasks } from "@/components/daily-tasks"
 
 export default function Home() {
@@ -27,7 +27,7 @@ export default function Home() {
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
               <DailyBrief />
               <AgentStatus />
-              <StockTickers />
+              <PolymarketPrices />
               <DailyTasks />
             </div>
           </div>

@@ -39,8 +39,8 @@ const items = [
     icon: Activity,
   },
   {
-    title: "Market",
-    url: "#market",
+    title: "Polymarket",
+    url: "#polymarket",
     icon: Wallet,
   },
   {
