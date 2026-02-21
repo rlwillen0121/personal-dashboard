@@ -52,21 +52,23 @@ const items = [
 
 export function AppSidebar() {
   return (
-    <Sidebar>
-      <SidebarHeader className="p-4">
-        <h2 className="text-xl font-bold">Personal Dash</h2>
+    <Sidebar className="border-r border-border">
+      <SidebarHeader className="p-6 border-b border-border">
+        <h2 className="text-xl font-black italic text-primary flex items-center gap-2 tracking-tighter">
+          CLAW <span className="text-[10px] uppercase font-bold tracking-widest bg-primary/20 px-1.5 py-0.5 rounded not-italic">v2.1</span>
+        </h2>
       </SidebarHeader>
-      <SidebarContent>
+      <SidebarContent className="p-2 pt-6">
         <SidebarGroup>
-          <SidebarGroupLabel>Application</SidebarGroupLabel>
+          <SidebarGroupLabel className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] mb-4 px-4">Workspace</SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu>
+            <SidebarMenu className="gap-1">
               {items.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <a href={item.url}>
-                      <item.icon />
-                      <span>{item.title}</span>
+                  <SidebarMenuButton asChild className="hover:bg-primary/10 hover:text-primary transition-all duration-200 py-6 px-4 rounded-lg group">
+                    <a href={item.url} className="flex items-center gap-3">
+                      <item.icon className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                      <span className="font-semibold text-sm tracking-tight">{item.title}</span>
                     </a>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

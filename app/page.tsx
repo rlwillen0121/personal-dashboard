@@ -10,10 +10,10 @@ export default function Home() {
     <SidebarProvider>
       <div className="flex min-h-screen w-full">
         <AppSidebar />
-        <main className="flex-1 p-8 bg-slate-50 overflow-auto">
+        <main className="flex-1 p-8 bg-background overflow-auto">
           <div className="max-w-7xl mx-auto space-y-8">
             <header className="flex justify-between items-center">
-              <h1 className="text-3xl font-bold tracking-tight text-slate-900 line-clamp-1">Dashboard Overview</h1>
+              <h1 className="text-3xl font-bold tracking-tight text-foreground line-clamp-1">Dashboard Overview</h1>
               <div className="text-sm text-muted-foreground">
                 {new Date().toLocaleDateString('en-US', { 
                   weekday: 'long', 
