@@ -7,13 +7,22 @@ const ACCOUNT = 'ryanwillenai@gmail.com';
 
 export async function GET() {
   try {
-    // Fetch Calendar events
-    // Using --from today to ensure we get upcoming events
-    const calCommand = `gog calendar list --max 5 -a ${ACCOUNT} -j --results-only --from today`;
+    // Fetch Calendar events from the shared primary calendar
+    const CALENDAR_ID = 'ryan.willen@gmail.com';
+    const calCommand = `gog calendar events ${CALENDAR_ID} --max 5 -a ${ACCOUNT} -j --results-only --from today`;
     const { stdout: calOutput } = await execAsync(calCommand);
     let events = [];
     try {
-      events = JSON.parse(calOutput || '[]');
+      const rawEvents = JSON.parse(calOutput || '[]');
+      events = rawEvents.map((e: any) => ({
+        id: e.id,
+        date: e.start?.dateTime 
+          ? new Date(e.start.dateTime).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+          : e.start?.date 
+            ? new Date(e.start.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+            : 'TBD',
+        subject: e.summary || 'No Title'
+      }));
     } catch (e) {
       console.error('Failed to parse calendar JSON', e);
     }
