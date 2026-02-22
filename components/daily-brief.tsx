@@ -95,14 +95,14 @@ export default function DailyBrief() {
                   <li key={email.id} className="flex flex-col group p-2 rounded-lg hover:bg-muted/50 transition-colors border border-transparent hover:border-border">
                     <div className="flex justify-between items-start gap-2 mb-1">
                       <span className="text-sm font-bold text-foreground truncate group-hover:text-primary transition-colors">
-                        {email.from.replace(/"/g, '').split('<')[0].trim() || email.from}
+                        {email.from ? email.from.replace(/"/g, '').split('<')[0].trim() : 'Unknown'}
                       </span>
                       <span className="text-[9px] text-muted-foreground font-mono whitespace-nowrap mt-1 uppercase">
-                        {email.date.includes(':') ? email.date.split(' ')[0] : email.date}
+                        {email.date ? (email.date.includes(':') ? email.date.split(' ')[0] : email.date) : ''}
                       </span>
                     </div>
                     <span className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
-                      {email.subject}
+                      {email.subject || '(No subject)'}
                     </span>
                   </li>
                 )) : (

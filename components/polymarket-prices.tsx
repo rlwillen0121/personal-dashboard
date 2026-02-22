@@ -14,17 +14,21 @@ interface Market {
 export function PolymarketPrices() {
   const [markets, setMarkets] = useState<Market[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchMarkets() {
       try {
         const response = await fetch('/api/polymarket');
+        if (!response.ok) throw new Error('API request failed');
         const data = await response.json();
         if (Array.isArray(data)) {
           setMarkets(data);
+          setError(null);
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Failed to fetch Polymarket data:', error);
+        setError(error.message || 'Error connecting to API');
       } finally {
         setLoading(false);
       }
@@ -66,7 +70,10 @@ export function PolymarketPrices() {
             <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse" />
             Polymarket Trends
           </CardTitle>
-          <span className="text-[9px] text-muted-foreground font-mono bg-muted px-1.5 py-0.5 rounded uppercase">Live</span>
+          <div className="flex gap-2 items-center">
+            {error && <span className="text-[9px] text-rose-500 font-mono font-bold uppercase tracking-tighter">Err: {error}</span>}
+            <span className="text-[9px] text-muted-foreground font-mono bg-muted px-1.5 py-0.5 rounded uppercase">Live</span>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="flex-1 overflow-hidden pt-4 pb-0">

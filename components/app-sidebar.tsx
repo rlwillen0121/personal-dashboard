@@ -44,8 +44,8 @@ const items = [
     icon: Activity,
   },
   {
-    title: "Polymarket",
-    section: "polymarket",
+    title: "Arbitrage",
+    section: "arb",
     icon: Wallet,
   },
   {

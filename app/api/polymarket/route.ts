@@ -22,7 +22,13 @@ export async function GET() {
       if (!market) return null;
 
       // Polymarket returns odds as a string or number, we want to format them as percentages
-      const outcomes = JSON.parse(market.outcomePrices || '[]');
+      let outcomes = [];
+      try {
+        outcomes = JSON.parse(market.outcomePrices || '[]');
+      } catch (e) {
+        console.error('Error parsing outcomePrices:', e);
+        outcomes = [];
+      }
       const yesPrice = outcomes.length > 0 ? parseFloat(outcomes[0]) : null;
       
       return {

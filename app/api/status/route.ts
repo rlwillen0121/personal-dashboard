@@ -1,12 +1,120 @@
 import { NextResponse } from 'next/server';
-import { exec } from 'child_process';
-import { promisify } from 'util';
+import * as fs from 'fs';
+import * as path from 'path';
 
-const execAsync = promisify(exec);
-
-// Cache agent status for 30 seconds to speed up dashboard refreshes
+// Cache agent status and usage data for 60 seconds to speed up dashboard refreshes and reduce API calls
 let statusCache: { data: any, timestamp: number } | null = null;
-const CACHE_TTL = 30000; 
+const CACHE_TTL = 60000;
+
+// Helper function to find all session JSONL files
+function findSessionFiles(): string[] {
+  const agentsDir = '/home/ryanw/.openclaw/agents';
+  const files: string[] = [];
+  
+  try {
+    const dirs = fs.readdirSync(agentsDir);
+    for (const dir of dirs) {
+      const sessionDir = path.join(agentsDir, dir, 'sessions');
+      try {
+        const sessionFiles = fs.readdirSync(sessionDir);
+        for (const file of sessionFiles) {
+          if (file.endsWith('.jsonl')) {
+            files.push(path.join(sessionDir, file));
+          }
+        }
+      } catch (e) {
+        // Skip directories without sessions
+      }
+    }
+  } catch (e) {
+    console.warn('Could not read agents directory', e);
+  }
+  
+  return files;
+}
+
+// Helper function to parse a single JSONL file and extract usage data
+function parseSessionFile(filePath: string): any[] {
+  try {
+    const content = fs.readFileSync(filePath, 'utf-8');
+    const lines = content.trim().split('\n').filter(line => line.trim());
+    return lines.map(line => {
+      try {
+        return JSON.parse(line);
+      } catch (e) {
+        return null;
+      }
+    }).filter(Boolean);
+  } catch (e) {
+    console.error(`Error reading ${filePath}:`, e);
+    return [];
+  }
+}
+
+// Extract usage data from session messages
+function extractUsageData(messages: any[]): { model: string; input: number; output: number; cost: number }[] {
+  const usageData: { model: string; input: number; output: number; cost: number }[] = [];
+  
+  for (const msg of messages) {
+    if (msg.type === 'message' && msg.message) {
+      const usage = msg.message.usage;
+      if (usage) {
+        usageData.push({
+          model: msg.message.model || 'unknown',
+          input: usage.input || 0,
+          output: usage.output || 0,
+          cost: usage.cost?.total || 0
+        });
+      }
+    }
+  }
+  
+  return usageData;
+}
+
+// Aggregate usage data by model
+function aggregateUsageData(usageData: { model: string; input: number; output: number; cost: number }[]): {
+  totalCost: number;
+  totalPrompts: number;
+  totalCompletions: number;
+  totalTokens: number;
+  modelBreakdown: { model: string; cost: number; promptTokens: number; completionTokens: number; totalTokens: number }[];
+} {
+  const modelBreakdown: Record<string, { model: string; cost: number; promptTokens: number; completionTokens: number; totalTokens: number }> = {};
+  
+  for (const data of usageData) {
+    const model = data.model;
+    if (!modelBreakdown[model]) {
+      modelBreakdown[model] = {
+        model: model,
+        cost: 0,
+        promptTokens: 0,
+        completionTokens: 0,
+        totalTokens: 0
+      };
+    }
+    
+    modelBreakdown[model].cost += data.cost;
+    modelBreakdown[model].promptTokens += data.input;
+    modelBreakdown[model].completionTokens += data.output;
+    modelBreakdown[model].totalTokens += data.input + data.output;
+  }
+  
+  const modelBreakdownArray = Object.values(modelBreakdown).sort((a, b) => b.cost - a.cost);
+  
+  const totalCost = usageData.reduce((sum, d) => sum + d.cost, 0);
+  const totalPrompts = usageData.reduce((sum, d) => sum + d.input, 0);
+  const totalCompletions = usageData.reduce((sum, d) => sum + d.output, 0);
+  const totalTokens = totalPrompts + totalCompletions;
+  
+  return {
+    totalCost,
+    totalPrompts,
+    totalCompletions,
+    totalTokens,
+    modelBreakdown: modelBreakdownArray
+  };
+}
 
 export async function GET() {
   try {
@@ -15,40 +123,65 @@ export async function GET() {
       return NextResponse.json(statusCache.data);
     }
 
-    // 1. Get detailed agent list and bootstrap status
-    const { stdout: statusAll } = await execAsync('openclaw status --all --plain');
+    // 1. Get all session JSONL files
+    const sessionFiles = findSessionFiles();
     
-    // Parse the base agent list
-    const initialAgents = parseAgentList(statusAll);
+    // 2. Extract usage data from all session files
+    let allUsageData: { model: string; input: number; output: number; cost: number }[] = [];
+    
+    for (const file of sessionFiles) {
+      const messages = parseSessionFile(file);
+      const usageData = extractUsageData(messages);
+      allUsageData = allUsageData.concat(usageData);
+    }
+    
+    // 3. Aggregate usage data by model
+    const usageSummary = aggregateUsageData(allUsageData);
 
-    // 2. Fetch all session usages in parallel
-    const agentData = await Promise.all(
-      initialAgents.map(async (agent) => {
-        try {
-          const { stdout: sessionsOutput } = await execAsync(`openclaw sessions list --agent ${agent.id} --limit 50 --active-minutes 10000 --kinds group,direct`);
-          
-          let totalTokens = 0;
-          const sessionLines = sessionsOutput.split('\n');
-          for (const line of sessionLines) {
-            const tokensMatch = line.match(/(\d+)k\/\d+k/);
-            if (tokensMatch) {
-              totalTokens += parseInt(tokensMatch[1]);
-            }
-          }
-          
-          return {
-            ...agent,
-            cost: (totalTokens * 1000) * (0.000000075) // Rough estimate
-          };
-        } catch (e) {
-          console.warn(`Could not fetch sessions for agent ${agent.id}`, e);
-          return agent;
-        }
-      })
-    );
+    // 4. Get detailed agent list from the CLI for local agents
+    const { exec } = await import('child_process');
+    const { promisify } = await import('util');
+    const execAsync = promisify(exec);
+
+    let localAgents: any[] = [];
+    try {
+      const { stdout: statusAll } = await execAsync('openclaw status --all --plain');
+      localAgents = parseAgentList(statusAll);
+    } catch (e) {
+      console.warn('Could not fetch local agent list', e);
+    }
+
+    // 5. Enrich local agents with usage data by matching model names
+    const agentData = localAgents.map(agent => {
+      const agentNameLower = agent.id.toLowerCase();
+      
+      // Find usage entries matching this agent's name or model
+      const matchingUsage = usageSummary.modelBreakdown.filter(entry =>
+        entry.model.toLowerCase().includes(agentNameLower) ||
+        agentNameLower.includes(entry.model.toLowerCase().split('/')[1] || entry.model)
+      );
+      
+      const totalTokens = matchingUsage.reduce((sum, entry) => sum + entry.totalTokens, 0);
+      const totalCost = matchingUsage.reduce((sum, entry) => sum + entry.cost, 0);
+      
+      const modelUsage = matchingUsage.map(entry => ({
+        model: entry.model,
+        prompt_tokens: entry.promptTokens,
+        completion_tokens: entry.completionTokens,
+        cost: entry.cost
+      }));
+
+      return {
+        ...agent,
+        cost: totalCost,
+        tokenCount: totalTokens,
+        modelUsage: modelUsage
+      };
+    });
 
     const responseData = {
       agents: agentData,
+      openRouterSummary: usageSummary,
       timestamp: new Date().toISOString(),
     };
 

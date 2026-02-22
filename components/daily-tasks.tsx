@@ -19,14 +19,18 @@ export function DailyTasks() {
   const [loading, setLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
   async function fetchTasks() {
     try {
       const response = await fetch('/api/tasks');
+      if (!response.ok) throw new Error('Failed to fetch tasks');
       const data = await response.json();
       setTasks(data || []);
-    } catch (e) {
+      setError(null);
+    } catch (e: any) {
       console.error("Failed to fetch tasks", e);
+      setError(e.message || "Error loading tasks");
     } finally {
       setLoading(false);
     }
@@ -96,7 +100,10 @@ export function DailyTasks() {
   return (
     <Card className="col-span-1 shadow-sm border-border flex flex-col min-h-[300px]">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 shrink-0">
-        <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-widest">Focus for Today</CardTitle>
+        <div className="flex flex-col">
+          <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-widest">Focus for Today</CardTitle>
+          {error && <span className="text-[10px] text-destructive font-mono mt-0.5 uppercase tracking-tighter">Err: {error}</span>}
+        </div>
         <Button 
           variant="ghost" 
           size="icon" 

@@ -4,7 +4,9 @@ import { SidebarProvider } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/app-sidebar"
 import DailyBrief from "@/components/daily-brief"
 import { AgentStatus } from "@/components/agent-status"
-import { PolymarketPrices } from "@/components/polymarket-prices"
+import { AgentActivity } from "@/components/agent-activity"
+import { ArbTracking } from "@/components/arb-tracking"
+import { ArbDetailedView } from "@/components/arb-detailed-view"
 import { DailyTasks } from "@/components/daily-tasks"
 import { useState } from "react"
 
@@ -14,20 +16,30 @@ export default function Home() {
   const renderContent = () => {
     switch (activeSection) {
       case "brief":
-        return <div className="w-full"><DailyBrief /></div>
+        return <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"><DailyBrief /></div>
       case "agents":
-        return <div className="w-full"><AgentStatus /></div>
-      case "polymarket":
-        return <div className="w-full"><PolymarketPrices /></div>
+        return (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <AgentStatus />
+            <AgentActivity />
+          </div>
+        )
+      case "arb":
+        return (
+          <div className="space-y-6">
+            <h2 className="text-xl font-bold text-foreground">Arbitrage Search & Execution (Paper)</h2>
+            <ArbDetailedView />
+          </div>
+        )
       case "tasks":
-        return <div className="w-full"><DailyTasks /></div>
+        return <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"><DailyTasks /></div>
       default:
         // Return to the original grid layout the user liked (non-scrolling main view)
         return (
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
             <DailyBrief />
             <AgentStatus />
-            <PolymarketPrices />
+            <ArbTracking />
             <DailyTasks />
           </div>
         )
