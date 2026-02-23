@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 interface ArbLeg {
   team: string;
@@ -20,20 +21,64 @@ interface ArbOpportunity {
   leg2: ArbLeg;
 }
 
+interface ArbBet {
+  id: number;
+  event: string;
+  sport: string;
+  leg1_book: string;
+  leg1_team: string;
+  leg1_odds: number;
+  leg2_book: string;
+  leg2_team: string;
+  leg2_odds: number;
+  stake: number;
+  potential_payout: number;
+  status: 'pending' | 'won' | 'lost';
+  result_updated_at: string | null;
+  created_at: string;
+}
+
+interface Bankroll {
+  id: number;
+  balance: number;
+  updated_at: string;
+}
+
 export function ArbTracking() {
-  const [arbs, setArbs] = useState<ArbOpportunity[]>([]);
+  const [arbs, setArbs] = useState<ArbBet[]>([]);
+  const [bankroll, setBankroll] = useState<Bankroll | null>(null);
+  const [bankrollHistory, setBankrollHistory] = useState<Bankroll[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const chartData = useMemo(() =>
+    bankrollHistory.map(entry => ({
+      time: new Date(entry.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      balance: entry.balance
+    })), [bankrollHistory]);
+
   useEffect(() => {
-    async function fetchArbs() {
+    async function fetchArbData() {
       try {
-        const response = await fetch('/api/arb-ledger');
-        if (!response.ok) throw new Error('API request failed');
-        const data = await response.json();
-        if (Array.isArray(data)) {
-          setArbs(data);
+        const [arbResponse, bankrollResponse, historyResponse] = await Promise.all([
+          fetch('/api/arb/bets'),
+          fetch('/api/arb/bankroll')
+        ]);
+
+        if (!arbResponse.ok || !bankrollResponse.ok || !historyResponse.ok) {
+          throw new Error('API request failed');
+        }
+
+        const arbData = await arbResponse.json();
+        const bankrollData = await bankrollResponse.json();
+        const historyData = await historyResponse.json();
+
+        if (Array.isArray(arbData)) {
+          setArbs(arbData);
           setError(null);
+        }
+        if (bankrollData.balance !== undefined) {
+          setBankroll(bankrollData);
         }
       } catch (error: any) {
         console.error('Failed to fetch Arb data:', error);
@@ -43,8 +88,8 @@ export function ArbTracking() {
       }
     }
 
-    fetchArbs();
-    const interval = setInterval(fetchArbs, 60000); // Update every minute
+    fetchArbData();
+    const interval = setInterval(fetchArbData, 60000); // Update every minute
     return () => clearInterval(interval);
   }, []);
 
@@ -77,61 +122,126 @@ export function ArbTracking() {
         <div className="flex justify-between items-center">
           <CardTitle className="text-foreground text-xs font-bold uppercase tracking-widest flex items-center gap-2">
             <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-            Sports Arb Ledger
+            Sports Arb Tracker
           </CardTitle>
           <div className="flex gap-2 items-center">
             {error && <span className="text-[9px] text-rose-500 font-mono font-bold uppercase tracking-tighter">Err: {error}</span>}
-            <span className="text-[9px] text-muted-foreground font-mono bg-muted px-1.5 py-0.5 rounded uppercase">Paper Trading</span>
+            <span className="text-[9px] text-muted-foreground font-mono bg-muted px-1.5 py-0.5 rounded uppercase">Live DB</span>
           </div>
         </div>
       </CardHeader>
       <CardContent className="flex-1 overflow-hidden pt-4 pb-0">
-        <div className="h-full overflow-y-auto pr-1 custom-scrollbar max-h-[220px]">
+        {/* Bankroll Summary */}
+        <div className="grid grid-cols-3 gap-2 mb-3">
+          <div className="bg-emerald-500/10 border border-emerald-500/20 rounded p-2">
+            <div className="text-[8px] text-emerald-600 uppercase font-bold">Current Balance</div>
+            <div className="text-lg font-bold text-emerald-700 font-mono">
+              {bankroll ? `$${bankroll.balance.toFixed(2)}` : '$1000.00'}
+            </div>
+          </div>
+          <div className="bg-blue-500/10 border border-blue-500/20 rounded p-2">
+            <div className="text-[8px] text-blue-600 uppercase font-bold">Pending</div>
+            <div className="text-lg font-bold text-blue-700 font-mono">
+              {arbs.filter(b => b.status === 'pending').length} bets
+            </div>
+          </div>
+          <div className="bg-purple-500/10 border border-purple-500/20 rounded p-2">
+            <div className="text-[8px] text-purple-600 uppercase font-bold">Won/Lost</div>
+            <div className="text-lg font-bold text-purple-700 font-mono">
+              {arbs.filter(b => b.status === 'won').length} / {arbs.filter(b => b.status === 'lost').length}
+            </div>
+          </div>
+        </div>
+
+        {bankrollHistory.length > 0 && (
+          <div className="h-[150px] mb-3 border border-border/30 rounded-md p-px bg-muted/30">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={chartData}>
+                <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="hsl(var(--border))" opacity="0.3" />
+                <XAxis 
+                  dataKey="time" 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} 
+                  interval={0}
+                />
+                <YAxis 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} 
+                  tickCount={3}
+                />
+                <Tooltip />
+                <Line 
+                  type="monotone" 
+                  dataKey="balance" 
+                  stroke="hsl(var(--emerald-500))" 
+                  strokeWidth={2.5}
+                  dot={false}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
+        <div className="h-full overflow-y-auto pr-1 custom-scrollbar max-h-[170px]">
           <div className="space-y-1 pb-4">
             {arbs.map((arb, idx) => (
-              <div 
-                key={idx} 
+              <div
+                key={idx}
                 className="group flex flex-col gap-1 p-2 rounded-lg hover:bg-muted/50 transition-colors border border-transparent hover:border-border"
               >
                 <div className="flex justify-between items-start">
                   <div className="flex flex-col min-w-0">
                     <span className="text-[9px] text-emerald-500 font-bold font-mono uppercase tracking-tighter opacity-80">
-                      {arb.sport.replace('_', ' ')}
+                      {arb.sport ? arb.sport.replace('_', ' ') : 'Unknown'}
                     </span>
                     <span className="text-xs text-foreground font-medium truncate">
                       {arb.event}
                     </span>
                   </div>
-                  <div className="bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold">
-                    +{arb.expected_profit_pct}%
+                  <div className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold ${
+                    arb.status === 'won' ? 'bg-green-500/20 text-green-600 border border-green-500/30' :
+                    arb.status === 'lost' ? 'bg-red-500/20 text-red-600 border border-red-500/30' :
+                    'bg-blue-500/20 text-blue-600 border border-blue-500/30'
+                  }`}>
+                    {arb.status.toUpperCase()}
                   </div>
                 </div>
-                
+
                 <div className="grid grid-cols-2 gap-2 mt-1">
                   <div className="text-[10px] bg-muted/30 p-1 rounded border border-border/30">
-                    <div className="text-muted-foreground uppercase text-[8px] font-bold truncate">{arb.leg1.book}</div>
+                    <div className="text-muted-foreground uppercase text-[8px] font-bold truncate">{arb.leg1_book}</div>
                     <div className="flex justify-between items-baseline">
-                      <span className="truncate font-medium">{arb.leg1.team}</span>
-                      <span className="font-mono font-bold text-blue-500">@{arb.leg1.odds}</span>
+                      <span className="truncate font-medium">{arb.leg1_team}</span>
+                      <span className="font-mono font-bold text-blue-500">@{arb.leg1_odds}</span>
                     </div>
                   </div>
                   <div className="text-[10px] bg-muted/30 p-1 rounded border border-border/30">
-                    <div className="text-muted-foreground uppercase text-[8px] font-bold truncate">{arb.leg2.book}</div>
+                    <div className="text-muted-foreground uppercase text-[8px] font-bold truncate">{arb.leg2_book}</div>
                     <div className="flex justify-between items-baseline">
-                      <span className="truncate font-medium">{arb.leg2.team}</span>
-                      <span className="font-mono font-bold text-blue-500">@{arb.leg2.odds}</span>
+                      <span className="truncate font-medium">{arb.leg2_team}</span>
+                      <span className="font-mono font-bold text-blue-500">@{arb.leg2_odds}</span>
                     </div>
                   </div>
                 </div>
+
+                {arb.stake > 0 && (
+                  <div className="text-[8px] text-muted-foreground font-mono flex justify-between mt-1">
+                    <span>Stake: ${arb.stake.toFixed(2)}</span>
+                    <span>Payout: ${arb.potential_payout.toFixed(2)}</span>
+                  </div>
+                )}
+
                 <div className="text-[8px] text-muted-foreground/50 font-mono self-end">
-                  {new Date(arb.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  {new Date(arb.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </div>
               </div>
             ))}
             {arbs.length === 0 && (
               <div className="text-center py-10">
                 <div className="text-muted-foreground text-xs font-mono uppercase tracking-[0.2em] opacity-30">
-                  Scanning_Markets...
+                  No Bets Placed Yet
                 </div>
               </div>
             )}
