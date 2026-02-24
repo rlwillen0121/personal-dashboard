@@ -72,7 +72,7 @@ export function AppSidebar({ onNavigate, activeSection }: AppSidebarProps) {
     <Sidebar className="border-r border-border">
       <SidebarHeader className="p-6 border-b border-border">
         <h2 className="text-xl font-black italic text-primary flex items-center gap-2 tracking-tighter">
-          CLAW <span className="text-[10px] uppercase font-bold tracking-widest bg-primary/20 px-1.5 py-0.5 rounded not-italic">v2.1</span>
+          CLAW <span className="text-[10px] uppercase font-bold tracking-widest bg-primary/20 px-1.5 py-0.5 rounded not-italic">v2.2</span>
         </h2>
       </SidebarHeader>
       <SidebarContent className="p-2 pt-6">
