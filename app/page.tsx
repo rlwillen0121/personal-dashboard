@@ -8,6 +8,7 @@ import { AgentActivity } from "@/components/agent-activity"
 import { ArbTracking } from "@/components/arb-tracking"
 import { ArbDetailedView } from "@/components/arb-detailed-view"
 import { DailyTasks } from "@/components/daily-tasks"
+import Office8Bit from "@/components/office-8bit"
 import { useState } from "react"
 
 export default function Home() {
@@ -27,12 +28,18 @@ export default function Home() {
       case "arb":
         return (
           <div className="space-y-6">
-            <h2 className="text-xl font-bold text-foreground">Arbitrage Search & Execution (Paper)</h2>
-            <ArbDetailedView />
+            <h2 className="text-xl font-bold text-foreground">Arbitrage Dashboard</h2>
+            <ArbTracking />
           </div>
         )
       case "tasks":
         return <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"><DailyTasks /></div>
+      case "office":
+        return (
+          <div className="w-full">
+            <Office8Bit />
+          </div>
+        )
       default:
         // Return to the original grid layout the user liked (non-scrolling main view)
         return (

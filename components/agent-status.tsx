@@ -51,11 +51,11 @@ export function AgentStatus() {
 
   const totalCost = agents.reduce((acc, agent) => acc + (agent.cost || 0), 0);
 
-  // Calculate model usage summary across all agents
+  // Calculate model usage from agents' modelUsage data
   const modelUsageSummary = agents.reduce((acc, agent) => {
     if (agent.modelUsage) {
       agent.modelUsage.forEach((usage) => {
-        const model = usage.model;
+        const model = usage.model || 'unknown';
         if (!acc[model]) {
           acc[model] = {
             model: model,
@@ -70,7 +70,7 @@ export function AgentStatus() {
       });
     }
     return acc;
-  }, {} as Record<string, { model: string; prompt_tokens: number; completion_tokens: number; cost: number }>);
+  }, {} as Record<string, { model: string; prompt_tokens: number; completion_tokens: 0; cost: number }>);
 
   const modelUsageList = Object.values(modelUsageSummary).sort((a, b) => b.cost - a.cost);
 

@@ -8,6 +8,7 @@ import {
   CheckSquare,
   Activity,
   User,
+  Building2,
 } from "lucide-react"
 
 import {
@@ -52,6 +53,11 @@ const items = [
     title: "Tasks",
     section: "tasks",
     icon: CheckSquare,
+  },
+  {
+    title: "8-Bit Office",
+    section: "office",
+    icon: Building2,
   },
 ]
 
