@@ -1,119 +1,109 @@
 import { NextResponse } from 'next/server';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as os from 'os';
+
+const execAsync = promisify(exec);
 
 // Cache agent status and usage data for 60 seconds to speed up dashboard refreshes and reduce API calls
 let statusCache: { data: any, timestamp: number } | null = null;
 const CACHE_TTL = 60000;
 
-// Helper function to find all session JSONL files
-function findSessionFiles(): string[] {
-  const agentsDir = '/home/ryanw/.openclaw/agents';
-  const files: string[] = [];
+// Interface for model cost configuration
+interface ModelCostConfig {
+  input: number;
+  output: number;
+  cacheRead?: number;
+  cacheWrite?: number;
+}
+
+// Interface for model pricing loaded from config
+interface ModelPricing {
+  [modelId: string]: ModelCostConfig;
+}
+
+// Load model pricing from OpenClaw config
+async function loadModelPricing(): Promise<ModelPricing> {
+  const pricing: ModelPricing = {};
   
   try {
-    const dirs = fs.readdirSync(agentsDir);
-    for (const dir of dirs) {
-      const sessionDir = path.join(agentsDir, dir, 'sessions');
-      try {
-        const sessionFiles = fs.readdirSync(sessionDir);
-        for (const file of sessionFiles) {
-          if (file.endsWith('.jsonl')) {
-            files.push(path.join(sessionDir, file));
+    const configPath = path.join(os.homedir(), '.openclaw', 'openclaw.json');
+    const configContent = fs.readFileSync(configPath, 'utf-8');
+    const config = JSON.parse(configContent);
+    
+    const providers = config.models?.providers || {};
+    
+    for (const [providerId, providerConfig] of Object.entries(providers)) {
+      const models = (providerConfig as any).models || [];
+      for (const model of models) {
+        if (model.cost) {
+          pricing[model.id] = model.cost;
+        }
+        // Also index by short name (after the slash)
+        if (model.id.includes('/')) {
+          const shortName = model.id.split('/').pop();
+          if (shortName && !pricing[shortName]) {
+            pricing[shortName] = model.cost;
           }
         }
-      } catch (e) {
-        // Skip directories without sessions
       }
     }
   } catch (e) {
-    console.warn('Could not read agents directory', e);
+    console.warn('Could not load model pricing from config:', e);
   }
   
-  return files;
+  return pricing;
 }
 
-// Helper function to parse a single JSONL file and extract usage data
-function parseSessionFile(filePath: string): any[] {
-  try {
-    const content = fs.readFileSync(filePath, 'utf-8');
-    const lines = content.trim().split('\n').filter(line => line.trim());
-    return lines.map(line => {
-      try {
-        return JSON.parse(line);
-      } catch (e) {
-        return null;
-      }
-    }).filter(Boolean);
-  } catch (e) {
-    console.error(`Error reading ${filePath}:`, e);
-    return [];
-  }
-}
-
-// Extract usage data from session messages
-function extractUsageData(messages: any[]): { model: string; input: number; output: number; cost: number }[] {
-  const usageData: { model: string; input: number; output: number; cost: number }[] = [];
+// Calculate cost for a model given input/output tokens
+// Cost config values are $ per MILLION tokens
+function calculateCost(pricing: ModelPricing, modelId: string, inputTokens: number, outputTokens: number): number {
+  // Try exact match first
+  let costConfig = pricing[modelId];
   
-  for (const msg of messages) {
-    if (msg.type === 'message' && msg.message) {
-      const usage = msg.message.usage;
-      if (usage) {
-        usageData.push({
-          model: msg.message.model || 'unknown',
-          input: usage.input || 0,
-          output: usage.output || 0,
-          cost: usage.cost?.total || 0
-        });
+  // Try short name (after the slash)
+  if (!costConfig && modelId.includes('/')) {
+    const shortName = modelId.split('/').pop();
+    if (shortName) {
+      costConfig = pricing[shortName];
+    }
+  }
+  
+  // Try contains match (e.g., "claude-sonnet-4-5" matches "anthropic/claude-sonnet-4-5")
+  if (!costConfig) {
+    for (const [configModelId, config] of Object.entries(pricing)) {
+      if (modelId.toLowerCase().includes(configModelId.toLowerCase()) ||
+          configModelId.toLowerCase().includes(modelId.toLowerCase())) {
+        costConfig = config;
+        break;
       }
     }
   }
   
-  return usageData;
-}
-
-// Aggregate usage data by model
-function aggregateUsageData(usageData: { model: string; input: number; output: number; cost: number }[]): {
-  totalCost: number;
-  totalPrompts: number;
-  totalCompletions: number;
-  totalTokens: number;
-  modelBreakdown: { model: string; cost: number; promptTokens: number; completionTokens: number; totalTokens: number }[];
-} {
-  const modelBreakdown: Record<string, { model: string; cost: number; promptTokens: number; completionTokens: number; totalTokens: number }> = {};
-  
-  for (const data of usageData) {
-    const model = data.model;
-    if (!modelBreakdown[model]) {
-      modelBreakdown[model] = {
-        model: model,
-        cost: 0,
-        promptTokens: 0,
-        completionTokens: 0,
-        totalTokens: 0
-      };
-    }
-    
-    modelBreakdown[model].cost += data.cost;
-    modelBreakdown[model].promptTokens += data.input;
-    modelBreakdown[model].completionTokens += data.output;
-    modelBreakdown[model].totalTokens += data.input + data.output;
+  if (!costConfig) {
+    return 0;
   }
   
-  const modelBreakdownArray = Object.values(modelBreakdown).sort((a, b) => b.cost - a.cost);
+  // Cost is $ per million tokens
+  const inputCost = ((inputTokens || 0) / 1_000_000) * (costConfig.input || 0);
+  const outputCost = ((outputTokens || 0) / 1_000_000) * (costConfig.output || 0);
   
-  const totalCost = usageData.reduce((sum, d) => sum + d.cost, 0);
-  const totalPrompts = usageData.reduce((sum, d) => sum + d.input, 0);
-  const totalCompletions = usageData.reduce((sum, d) => sum + d.output, 0);
-  const totalTokens = totalPrompts + totalCompletions;
-  
-  return {
-    totalCost,
-    totalPrompts,
-    totalCompletions,
-    totalTokens,
-    modelBreakdown: modelBreakdownArray
-  };
+  return inputCost + outputCost;
+}
+
+// Helper function to format age string
+function formatAge(ageMs: number): string {
+  if (!ageMs) return 'unknown';
+  const seconds = Math.floor(ageMs / 1000);
+  if (seconds < 60) return `${seconds}s ago`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
 }
 
 export async function GET() {
@@ -123,59 +113,121 @@ export async function GET() {
       return NextResponse.json(statusCache.data);
     }
 
-    // 1. Get all session JSONL files
-    const sessionFiles = findSessionFiles();
+    // 1. Load model pricing from OpenClaw config
+    const modelPricing = await loadModelPricing();
     
-    // 2. Extract usage data from all session files
-    let allUsageData: { model: string; input: number; output: number; cost: number }[] = [];
-    
-    for (const file of sessionFiles) {
-      const messages = parseSessionFile(file);
-      const usageData = extractUsageData(messages);
-      allUsageData = allUsageData.concat(usageData);
-    }
-    
-    // 3. Aggregate usage data by model
-    const usageSummary = aggregateUsageData(allUsageData);
-
-    // 4. Get detailed agent list from the CLI for local agents
-    const { exec } = await import('child_process');
-    const { promisify } = await import('util');
-    const execAsync = promisify(exec);
-
+    // 2. Get agent list from OpenClaw CLI (native)
     let localAgents: any[] = [];
     try {
-      const { stdout: statusAll } = await execAsync('openclaw status --all --plain');
-      localAgents = parseAgentList(statusAll);
+      const { stdout: agentsJson } = await execAsync('openclaw agents list --json');
+      const agentsData = JSON.parse(agentsJson);
+      
+      localAgents = agentsData.map((agent: any) => ({
+        id: agent.id,
+        name: agent.name || agent.identityName || agent.id,
+        role: agent.identityName !== agent.name ? agent.identityName : undefined,
+        status: 'OK',
+        active: 'unknown',
+        sessionsCount: 0,
+        workspaceDir: agent.workspace,
+        model: agent.model,
+        cost: 0
+      }));
     } catch (e) {
-      console.warn('Could not fetch local agent list', e);
+      console.warn('Could not fetch agent list from CLI:', e);
     }
 
-    // 5. Enrich local agents with usage data by matching model names
-    const agentData = localAgents.map(agent => {
-      const agentNameLower = agent.id.toLowerCase();
+    // 3. Get session data from OpenClaw CLI (native)
+    let allSessions: any[] = [];
+    try {
+      const { stdout: sessionsJson } = await execAsync('openclaw sessions --active 14400 --all-agents --json');
+      const sessionsData = JSON.parse(sessionsJson);
+      allSessions = sessionsData.sessions || [];
+    } catch (e) {
+      console.warn('Could not fetch session list from CLI:', e);
+    }
+
+    // 4. Aggregate usage data by model
+    const modelBreakdown: Record<string, { model: string; cost: number; promptTokens: number; completionTokens: number; totalTokens: number }> = {};
+    
+    for (const session of allSessions) {
+      const model = session.model || 'unknown';
+      const inputTokens = session.inputTokens || 0;
+      const outputTokens = session.outputTokens || 0;
       
-      // Find usage entries matching this agent's name or model
-      const matchingUsage = usageSummary.modelBreakdown.filter(entry =>
-        entry.model.toLowerCase().includes(agentNameLower) ||
-        agentNameLower.includes(entry.model.toLowerCase().split('/')[1] || entry.model)
+      if (!modelBreakdown[model]) {
+        modelBreakdown[model] = {
+          model: model,
+          cost: 0,
+          promptTokens: 0,
+          completionTokens: 0,
+          totalTokens: 0
+        };
+      }
+      
+      // Calculate cost using model pricing
+      const sessionCost = calculateCost(modelPricing, model, inputTokens, outputTokens);
+      modelBreakdown[model].cost += sessionCost;
+      modelBreakdown[model].promptTokens += inputTokens;
+      modelBreakdown[model].completionTokens += outputTokens;
+      modelBreakdown[model].totalTokens += inputTokens + outputTokens;
+    }
+    
+    const modelBreakdownArray = Object.values(modelBreakdown).sort((a, b) => b.cost - a.cost);
+    
+    const totalCost = modelBreakdownArray.reduce((sum, entry) => sum + entry.cost, 0);
+    const totalPrompts = modelBreakdownArray.reduce((sum, entry) => sum + entry.promptTokens, 0);
+    const totalCompletions = modelBreakdownArray.reduce((sum, entry) => sum + entry.completionTokens, 0);
+    const totalTokens = totalPrompts + totalCompletions;
+    
+    const usageSummary = {
+      totalCost,
+      totalPrompts,
+      totalCompletions,
+      totalTokens,
+      modelBreakdown: modelBreakdownArray
+    };
+
+    // 5. Enrich agents with usage data
+    const agentData = localAgents.map(agent => {
+      // Find sessions matching this agent
+      const agentSessions = allSessions.filter((s: any) => 
+        s.key && s.key.startsWith(`agent:${agent.id}:`)
       );
       
-      const totalTokens = matchingUsage.reduce((sum, entry) => sum + entry.totalTokens, 0);
-      const totalCost = matchingUsage.reduce((sum, entry) => sum + entry.cost, 0);
+      // Aggregate usage by model for this agent
+      const agentModelUsage: Record<string, { model: string; prompt_tokens: number; completion_tokens: number; cost: number }> = {};
       
-      const modelUsage = matchingUsage.map(entry => ({
-        model: entry.model,
-        prompt_tokens: entry.promptTokens,
-        completion_tokens: entry.completionTokens,
-        cost: entry.cost
-      }));
-
+      for (const session of agentSessions) {
+        const model = session.model || 'unknown';
+        const inputTokens = session.inputTokens || 0;
+        const outputTokens = session.outputTokens || 0;
+        
+        if (!agentModelUsage[model]) {
+          agentModelUsage[model] = {
+            model: model,
+            prompt_tokens: 0,
+            completion_tokens: 0,
+            cost: 0
+          };
+        }
+        
+        const sessionCost = calculateCost(modelPricing, model, inputTokens, outputTokens);
+        agentModelUsage[model].prompt_tokens += inputTokens;
+        agentModelUsage[model].completion_tokens += outputTokens;
+        agentModelUsage[model].cost += sessionCost;
+      }
+      
+      const modelUsage = Object.values(agentModelUsage);
+      const agentTotalTokens = modelUsage.reduce((sum, m) => sum + m.prompt_tokens + m.completion_tokens, 0);
+      const agentTotalCost = modelUsage.reduce((sum, m) => sum + m.cost, 0);
+      
       return {
         ...agent,
-        cost: totalCost,
-        tokenCount: totalTokens,
-        modelUsage: modelUsage
+        cost: agentTotalCost,
+        tokenCount: agentTotalTokens,
+        modelUsage: modelUsage,
+        sessionsCount: agentSessions.length
       };
     });
 
@@ -195,46 +247,4 @@ export async function GET() {
       { status: 500 }
     );
   }
-}
-
-function parseAgentList(statusOutput: string) {
-  const agents: any[] = [];
-  const statusLines = statusOutput.split('\n');
-  
-  let inAgentsTable = false;
-  for (const line of statusLines) {
-    // Detect start of Agents table
-    if (line.includes('Agent') && line.includes('Bootstrap') && line.includes('Sessions')) {
-      inAgentsTable = true;
-      continue;
-    }
-    
-    if (inAgentsTable) {
-      if (line.startsWith('└')) { inAgentsTable = false; continue; }
-      if (line.startsWith('├')) continue;
-      
-      const parts = line.split('│').map(p => p.trim()).filter(p => p !== '');
-      if (parts.length >= 4) {
-        // Extract ID and Name
-        // Example: "main (Assistant)"
-        const rawName = parts[0];
-        const nameMatch = rawName.match(/^([^(]+)(?:\(([^)]+)\))?$/);
-        
-        const id = nameMatch ? nameMatch[1].trim().toLowerCase() : rawName.toLowerCase();
-        const displayName = nameMatch ? nameMatch[1].trim() : rawName;
-        const role = nameMatch && nameMatch[2] ? nameMatch[2].trim() : '';
-
-        agents.push({
-          id,
-          name: displayName,
-          role,
-          status: parts[1], // OK or PENDING
-          active: parts[3], // "just now", "20m ago"
-          cost: 0 
-        });
-      }
-    }
-  }
-  
-  return agents;
 }
