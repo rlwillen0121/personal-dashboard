@@ -9,6 +9,7 @@ import { ArbTracking } from "@/components/arb-tracking"
 import { ArbDetailedView } from "@/components/arb-detailed-view"
 import { DailyTasks } from "@/components/daily-tasks"
 import Office8Bit from "@/components/office-8bit"
+import ReefOfficeCanvas from "@/components/reef-office-canvas"
 import { useState } from "react"
 
 export default function Home() {
@@ -37,7 +38,7 @@ export default function Home() {
       case "office":
         return (
           <div className="w-full">
-            <Office8Bit />
+            <ReefOfficeCanvas />
           </div>
         )
       default:
