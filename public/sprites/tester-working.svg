@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 16" width="64" height="16" shape-rendering="crispEdges">
+  <style>
+    @keyframes click {
+      0%, 100% { transform: translateX(0); }
+      50% { transform: translateX(2px); }
+    }
+    .cursor { animation: click 0.3s steps(1) infinite; }
+  </style>
+  <!-- Frame 1 - Mouse up -->
+  <g>
+    <rect x="6" y="6" width="4" height="6" fill="#00AA00"/>
+    <rect x="5" y="7" width="6" height="4" fill="#00AA00"/>
+    <rect x="6" y="2" width="4" height="4" fill="#AAAAAA"/>
+    <rect x="5" y="3" width="1" height="2" fill="#555555"/>
+    <rect x="10" y="3" width="1" height="2" fill="#555555"/>
+    <rect x="6" y="4" width="1" height="1" fill="#000000"/>
+    <rect x="9" y="4" width="1" height="1" fill="#000000"/>
+    <rect x="3" y="7" width="2" height="3" fill="#AAAAAA"/>
+    <rect x="11" y="7" width="2" height="3" fill="#AAAAAA"/>
+    <!-- Right hand on mouse -->
+    <rect x="12" y="10" width="2" height="2" fill="#AAAAAA"/>
+    <!-- Cursor trail -->
+    <rect x="14" y="8" width="1" height="1" fill="#00FFFF"/>
+    <rect x="3" y="10" width="1" height="1" fill="#AAAAAA"/>
+    <rect x="6" y="12" width="2" height="3" fill="#555555"/>
+    <rect x="9" y="12" width="2" height="3" fill="#555555"/>
+  </g>
+  <!-- Frame 2 - Clicking -->
+  <g transform="translate(16, 0)">
+    <rect x="6" y="6" width="4" height="6" fill="#00AA00"/>
+    <rect x="5" y="7" width="6" height="4" fill="#00AA00"/>
+    <rect x="6" y="2" width="4" height="4" fill="#AAAAAA"/>
+    <rect x="5" y="3" width="1" height="2" fill="#555555"/>
+    <rect x="10" y="3" width="1" height="2" fill="#555555"/>
+    <rect x="6" y="4" width="1" height="1" fill="#000000"/>
+    <rect x="9" y="4" width="1" height="1" fill="#000000"/>
+    <rect x="3" y="7" width="2" height="3" fill="#AAAAAA"/>
+    <rect x="11" y="7" width="2" height="3" fill="#AAAAAA"/>
+    <!-- Clicking -->
+    <rect x="12" y="11" width="2" height="1" fill="#AAAAAA"/>
+    <!-- Cursor trail stronger -->
+    <rect x="14" y="8" width="1" height="1" fill="#00FFFF"/>
+    <rect x="15" y="7" width="1" height="1" fill="#00FFFF"/>
+    <rect x="3" y="10" width="1" height="1" fill="#AAAAAA"/>
+    <rect x="6" y="12" width="2" height="3" fill="#555555"/>
+    <rect x="9" y="12" width="2" height="3" fill="#555555"/>
+  </g>
+  <!-- Frame 3 - Mouse up -->
+  <g transform="translate(32, 0)">
+    <rect x="6" y="6" width="4" height="6" fill="#00AA00"/>
+    <rect x="5" y="7" width="6" height="4" fill="#00AA00"/>
+    <rect x="6" y="2" width="4" height="4" fill="#AAAAAA"/>
+    <rect x="5" y="3" width="1" height="2" fill="#555555"/>
+    <rect x="10" y="3" width="1" height="2" fill="#555555"/>
+    <rect x="6" y="4" width="1" height="1" fill="#000000"/>
+    <rect x="9" y="4" width="1" height="1" fill="#000000"/>
+    <rect x="3" y="7" width="2" height="3" fill="#AAAAAA"/>
+    <rect x="11" y="7" width="2" height="3" fill="#AAAAAA"/>
+    <rect x="12" y="10" width="2" height="2" fill="#AAAAAA"/>
+    <rect x="14" y="8" width="1" height="1" fill="#00FFFF"/>
+    <rect x="3" y="10" width="1" height="1" fill="#AAAAAA"/>
+    <rect x="6" y="12" width="2" height="3" fill="#555555"/>
+    <rect x="9" y="12" width="2" height="3" fill="#555555"/>
+  </g>
+  <!-- Frame 4 - Double click -->
+  <g transform="translate(48, 0)">
+    <rect x="6" y="6" width="4" height="6" fill="#00AA00"/>
+    <rect x="5" y="7" width="6" height="4" fill="#00AA00"/>
+    <rect x="6" y="2" width="4" height="4" fill="#AAAAAA"/>
+    <rect x="5" y="3" width="1" height="2" fill="#555555"/>
+    <rect x="10" y="3" width="1" height="2" fill="#555555"/>
+    <rect x="6" y="4" width="1" height="1" fill="#000000"/>
+    <rect x="9" y="4" width="1" height="1" fill="#000000"/>
+    <rect x="3" y="7" width="2" height="3" fill="#AAAAAA"/>
+    <rect x="11" y="7" width="2" height="3" fill="#AAAAAA"/>
+    <!-- Double click -->
+    <rect x="12" y="11" width="2" height="1" fill="#AAAAAA"/>
+    <!-- Cursor trail -->
+    <rect x="14" y="8" width="1" height="1" fill="#00FFFF"/>
+    <rect x="15" y="7" width="1" height="1" fill="#00FFFF"/>
+    <rect x="16" y="6" width="1" height="1" fill="#00FFFF"/>
+    <rect x="3" y="10" width="1" height="1" fill="#AAAAAA"/>
+    <rect x="6" y="12" width="2" height="3" fill="#555555"/>
+    <rect x="9" y="12" width="2" height="3" fill="#555555"/>
+  </g>
+</svg>
