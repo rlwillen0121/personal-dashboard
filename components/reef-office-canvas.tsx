@@ -1,36 +1,15 @@
 "use client";
 
-import { useRef, useEffect, useState, useCallback } from "react";
+import { useRef, useEffect, useState } from "react";
+import Image from "next/image";
 
-// 8-bit Color Maps for the Reef Squad
-const PIXEL_MAPS = {
-  nemo: [
-    [0,0,1,1,1,0,0],
-    [0,1,1,1,1,1,0],
-    [1,1,2,2,1,1,1],
-    [1,1,1,1,1,1,1],
-    [0,1,1,1,1,1,0]
-  ], // 1: Orange, 2: White/Stripe
-  dory: [
-    [0,1,1,1,1,0,0],
-    [1,1,1,2,1,1,0],
-    [1,1,1,1,1,1,1],
-    [1,1,2,2,1,1,0],
-    [0,1,1,1,1,0,0]
-  ], // 1: Blue, 2: Yellow/Stripe
-  crush: [
-    [0,1,1,1,0],
-    [1,1,1,1,1],
-    [0,1,1,1,0],
-    [2,0,0,0,2]
-  ], // 1: Green Shell, 2: Flippers
-  hank: [
-    [0,1,1,1,0],
-    [1,1,1,1,1],
-    [1,1,1,1,1],
-    [2,2,2,2,2],
-    [2,0,2,0,2]
-  ] // 1: Red/Orange Head, 2: Tentacles
+// SVG Asset Paths
+const SVG_ASSETS = {
+  background: "/setting.svg",
+  nemo: "/nemo.svg",
+  dory: "/dory.svg",
+  crush: "/turtle.svg",
+  hank: "/octopus.svg"
 };
 
 interface Agent {
@@ -44,37 +23,76 @@ interface Agent {
   x: number; // Percentage 0-100
   y: number; // Percentage 0-100
   color: string;
-  char: keyof typeof PIXEL_MAPS;
+  char: "nemo" | "dory" | "crush" | "hank";
 }
 
 const agents: Agent[] = [
-  { id: "1", name: "NEMO (CODER)", role: "coder", status: "working", sessionId: "qwen-3-42", cost: 0.15, actions: 124, x: 20, y: 60, color: "#f97316", char: "nemo" },
-  { id: "2", name: "DORY (TESTER)", role: "tester", status: "idle", sessionId: "gpt-oss-01", cost: 0.08, actions: 89, x: 75, y: 25, color: "#3b82f6", char: "dory" },
-  { id: "3", name: "CRUSH (ARCH)", role: "researcher", status: "working", sessionId: "grok-4-fast", cost: 0.42, actions: 2500, x: 50, y: 45, color: "#22c55e", char: "crush" },
-  { id: "4", name: "HANK (BRAIN)", role: "manager", status: "working", sessionId: "minimax-m2.5", cost: 1.25, actions: 567, x: 15, y: 20, color: "#ef4444", char: "hank" },
+  { id: "1", name: "NEMO (CODER)", role: "coder", status: "working", sessionId: "glm-5-coder", cost: 0.15, actions: 124, x: 20, y: 60, color: "#f97316", char: "nemo" },
+  { id: "2", name: "DORY (TESTER)", role: "tester", status: "idle", sessionId: "glm-5-tester", cost: 0.08, actions: 89, x: 75, y: 25, color: "#3b82f6", char: "dory" },
+  { id: "3", name: "CRUSH (ARCH)", role: "researcher", status: "working", sessionId: "glm-5-research", cost: 0.42, actions: 2500, x: 50, y: 45, color: "#22c55e", char: "crush" },
+  { id: "4", name: "HANK (BRAIN)", role: "manager", status: "working", sessionId: "glm-5-main", cost: 1.25, actions: 567, x: 85, y: 70, color: "#ef4444", char: "hank" },
 ];
 
+function AgentSprite({ agent, selected, onClick }: { agent: Agent & { offset: number }; selected: boolean; onClick: () => void }) {
+  const [time, setTime] = useState(0);
+  
+  useEffect(() => {
+    const interval = setInterval(() => setTime(t => t + 0.05), 50);
+    return () => clearInterval(interval);
+  }, []);
+  
+  const hoverY = Math.sin(time * 2 + agent.offset) * 10;
+  const isFlipped = agent.x > 50;
+  
+  return (
+    <div
+      onClick={onClick}
+      className={`absolute cursor-pointer transition-all duration-200 ${selected ? 'z-20 scale-125' : 'z-10 hover:scale-110'}`}
+      style={{
+        left: `${agent.x}%`,
+        top: `${agent.y}%`,
+        transform: `translate(-50%, -50%) translateY(${hoverY}px) ${isFlipped ? 'scaleX(-1)' : ''}`,
+        width: '80px',
+        height: '80px'
+      }}
+    >
+      {/* Agent SVG */}
+      <Image
+        src={SVG_ASSETS[agent.char]}
+        alt={agent.name}
+        width={80}
+        height={80}
+        className="drop-shadow-lg"
+        priority
+      />
+      
+      {/* Working indicator */}
+      {agent.status === "working" && (
+        <div 
+          className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full animate-pulse"
+          style={{ boxShadow: '0 0 10px #22c55e' }}
+        />
+      )}
+      
+      {/* Selection ring */}
+      {selected && (
+        <div className="absolute inset-0 border-2 border-cyan-400 rounded-full animate-pulse" />
+      )}
+    </div>
+  );
+}
+
 export default function ReefOfficeCanvas() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const [selected, setSelected] = useState<Agent | null>(null);
   const [dimensions, setDimensions] = useState({ width: 854, height: 480 });
-  const animationRef = useRef<number>(0);
-  const timeRef = useRef<number>(0);
-
-  // Ref for persistent state to avoid re-initializing on every render
-  const stateRef = useRef({
-    bubbles: Array.from({ length: 20 }, () => ({
-      x: Math.random() * 100,
-      y: Math.random() * 100 + 100,
-      size: Math.random() * 4 + 2,
-      speed: Math.random() * 0.4 + 0.2,
-    })),
-    agents: agents.map(a => ({ ...a, currentY: a.y, offset: Math.random() * Math.PI * 2 }))
-  });
-
+  const [agentsWithOffset, setAgentsWithOffset] = useState<(Agent & { offset: number })[]>([]);
+  
   useEffect(() => {
+    // Add random offsets for animation variety
+    setAgentsWithOffset(agents.map(a => ({ ...a, offset: Math.random() * Math.PI * 2 })));
+    
     const handleResize = () => {
-      const width = Math.min(window.innerWidth - 40, 960);
+      const width = Math.min(window.innerWidth - 80, 960);
       setDimensions({ width, height: width * (9/16) });
     };
     window.addEventListener("resize", handleResize);
@@ -82,126 +100,30 @@ export default function ReefOfficeCanvas() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  const drawPixelSprite = useCallback((ctx: CanvasRenderingContext2D, agent: any, x: number, y: number, t: number) => {
-    const pixelSize = 6;
-    const map = PIXEL_MAPS[agent.char];
-    const flipped = agent.x > 50;
-    
-    ctx.save();
-    ctx.translate(x, y);
-    if (flipped) ctx.scale(-1, 1);
-
-    map.forEach((row, rowIndex) => {
-      row.forEach((pixel, colIndex) => {
-        if (pixel === 0) return;
-        
-        // Color logic based on pixel map values
-        if (pixel === 1) ctx.fillStyle = agent.color;
-        else if (pixel === 2) ctx.fillStyle = agent.char === 'nemo' ? "#fff" : "#fbbf24"; // Stripes/Accents
-        
-        ctx.fillRect(
-          colIndex * pixelSize - (map[0].length * pixelSize) / 2,
-          rowIndex * pixelSize - (map.length * pixelSize) / 2,
-          pixelSize,
-          pixelSize
-        );
-      });
-    });
-
-    // Draw "Working" Ping
-    if (agent.status === "working") {
-      ctx.fillStyle = "#22c55e";
-      ctx.shadowBlur = 10;
-      ctx.shadowColor = "#22c55e";
-      ctx.beginPath();
-      ctx.arc(15, -15, 3 + Math.sin(t * 5) * 1, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    ctx.restore();
-  }, []);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    const ctx = canvas?.getContext("2d");
-    if (!ctx || !canvas) return;
-
-    const animate = () => {
-      timeRef.current += 0.015;
-      const t = timeRef.current;
-      const { width, height } = dimensions;
-
-      // 1. Clear & Background
-      const skyGrad = ctx.createLinearGradient(0, 0, 0, height);
-      skyGrad.addColorStop(0, "#0077b6");
-      skyGrad.addColorStop(0.7, "#00b4d8");
-      skyGrad.addColorStop(1, "#90e0ef");
-      ctx.fillStyle = skyGrad;
-      ctx.fillRect(0, 0, width, height);
-
-      // 2. God Rays
-      ctx.fillStyle = "rgba(255, 255, 255, 0.05)";
-      for (let i = 0; i < 3; i++) {
-        ctx.beginPath();
-        ctx.moveTo(width * (0.2 + i * 0.3), 0);
-        ctx.lineTo(width * (0.4 + i * 0.3), 0);
-        ctx.lineTo(width * (0.1 + i * 0.3), height);
-        ctx.lineTo(width * (i * 0.3), height);
-        ctx.fill();
-      }
-
-      // 3. Bubbles
-      ctx.fillStyle = "rgba(255, 255, 255, 0.3)";
-      stateRef.current.bubbles.forEach(b => {
-        b.y -= b.speed;
-        if (b.y < -5) b.y = 105;
-        ctx.beginPath();
-        ctx.arc((b.x / 100) * width + Math.sin(t + b.x) * 10, (b.y / 100) * height, b.size, 0, Math.PI * 2);
-        ctx.fill();
-      });
-
-      // 4. Sand & Seaweed
-      ctx.fillStyle = "#caf0f8";
-      ctx.fillRect(0, height - 30, width, 30);
-
-      // 5. Draw Agents
-      stateRef.current.agents.forEach(agent => {
-        const x = (agent.x / 100) * width;
-        const hoverY = (agent.y / 100) * height + Math.sin(t * 2 + agent.offset) * 8;
-        agent.currentY = (hoverY / height) * 100; // Update current position for click detection
-        drawPixelSprite(ctx, agent, x, hoverY, t);
-      });
-
-      animationRef.current = requestAnimationFrame(animate);
-    };
-
-    animate();
-    return () => cancelAnimationFrame(animationRef.current);
-  }, [dimensions, drawPixelSprite]);
-
-  const handleClick = (e: React.MouseEvent) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const clickX = ((e.clientX - rect.left) / rect.width) * 100;
-    const clickY = ((e.clientY - rect.top) / rect.height) * 100;
-
-    // Detect click within a 10% radius of the agent
-    const hit = stateRef.current.agents.find(a => Math.abs(a.x - clickX) < 8 && Math.abs(a.currentY - clickY) < 8);
-    setSelected(hit || null);
-  };
-
   return (
     <div className="flex flex-col items-center w-full bg-[#000814] p-6 rounded-2xl border-4 border-[#023e8a] font-mono">
-      <div className="relative w-full group">
-        <canvas 
-          ref={canvasRef} 
-          width={dimensions.width} 
-          height={dimensions.height} 
-          onClick={handleClick}
-          className="rounded-lg shadow-[0_0_50px_rgba(0,180,216,0.3)] cursor-crosshair" 
+      <div 
+        className="relative w-full overflow-hidden rounded-lg shadow-[0_0_50px_rgba(0,180,216,0.3)]"
+        style={{ aspectRatio: '16/9', maxWidth: dimensions.width }}
+      >
+        {/* Background SVG */}
+        <Image
+          src={SVG_ASSETS.background}
+          alt="8-bit Ocean Setting"
+          fill
+          className="object-cover"
+          priority
         />
+        
+        {/* Agent Sprites */}
+        {agentsWithOffset.map(agent => (
+          <AgentSprite
+            key={agent.id}
+            agent={agent}
+            selected={selected?.id === agent.id}
+            onClick={() => setSelected(selected?.id === agent.id ? null : agent)}
+          />
+        ))}
         
         {/* HUD Overlay */}
         <div className="absolute top-4 right-4 bg-black/70 backdrop-blur-sm border border-cyan-500/50 p-3 rounded text-[10px] text-cyan-400 pointer-events-none">
@@ -240,7 +162,7 @@ export default function ReefOfficeCanvas() {
       )}
 
       <p className="mt-4 text-[10px] text-cyan-700 uppercase tracking-widest">
-        Click an entity to initiate secure handshake • reef_os v2.2.4
+        Click an entity to initiate secure handshake • reef_os v2.3.0
       </p>
     </div>
   );
