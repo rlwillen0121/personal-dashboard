@@ -2,6 +2,40 @@
 
 import { useState, useEffect } from "react";
 
+// Sprite paths mapping - sprites are in public/sprites/
+type SpriteState = "idle" | "working" | "walking";
+
+interface SpritePaths {
+  idle: string;
+  working?: string;
+  walking?: string;
+}
+
+const SPRITE_PATHS: Record<string, SpritePaths> = {
+  coder: {
+    idle: "/sprites/coder-idle.svg",
+    working: "/sprites/coder-working.svg",
+  },
+  researcher: {
+    idle: "/sprites/researcher-idle.svg",
+    working: "/sprites/researcher-working.svg",
+  },
+  tester: {
+    idle: "/sprites/tester-idle.svg",
+    working: "/sprites/tester-working.svg",
+  },
+  manager: {
+    idle: "/sprites/manager-idle.svg",
+    walking: "/sprites/manager-walking.svg",
+  },
+};
+
+const STATUS_ICONS: Record<string, string> = {
+  online: "/sprites/status-online.svg",
+  offline: "/sprites/status-offline.svg",
+  working: "/sprites/status-working.svg",
+};
+
 interface Agent {
   id: string;
   name: string;
@@ -15,26 +49,74 @@ interface Agent {
   color: string;
 }
 
+// Agent sprite component for office-8bit - uses external SVG sprites
+function AgentSprite8Bit({ 
+  role, 
+  status, 
+  size = 48,
+  agentName
+}: { 
+  role: "coder" | "researcher" | "tester" | "manager"; 
+  status: "working" | "idle" | "offline";
+  size?: number;
+  agentName: string;
+}) {
+  // Determine which sprite to use based on role and status
+  const getSpritePath = () => {
+    const roleSprites = SPRITE_PATHS[role];
+    if (!roleSprites) return SPRITE_PATHS.coder.idle;
+    
+    // Manager uses "walking" when not idle
+    if (role === "manager") {
+      return status === "idle" ? roleSprites.idle : (roleSprites.walking || roleSprites.idle);
+    }
+    // Other roles use "working" when working
+    const activeStatus = status === "working" || status === "offline" ? "working" : "idle";
+    return roleSprites[activeStatus] || roleSprites.idle;
+  };
+
+  // Get status icon
+  const getStatusIcon = () => {
+    if (status === "offline") return STATUS_ICONS.offline;
+    if (status === "working") return STATUS_ICONS.working;
+    return STATUS_ICONS.online;
+  };
+
+  return (
+    <div className={`relative transition-all duration-1000 group cursor-pointer`} style={{ imageRendering: "pixelated" }}>
+      {/* Status icon above agent */}
+      <img 
+        src={getStatusIcon()} 
+        alt={status}
+        className="absolute -top-2 -right-2 z-20"
+        style={{ width: 16, height: 16, imageRendering: "pixelated" }}
+      />
+      
+      {/* Agent sprite */}
+      <img 
+        src={getSpritePath()} 
+        alt={`${role} ${status}`}
+        style={{ 
+          width: size, 
+          height: size, 
+          imageRendering: "pixelated",
+        }}
+      />
+      
+      {/* Hover tooltip */}
+      <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-black/80 text-[10px] px-2 py-0.5 rounded border border-white/20 text-white whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">
+        {agentName}
+      </div>
+    </div>
+  );
+}
+
 const agents: Agent[] = [
   { id: "1", name: "NEMO (CODER)", role: "coder", status: "working", sessionId: "qwen-3-42", cost: 0.15, actions: 124, x: 15, y: 65, color: "#f97316" },
   { id: "2", name: "DORY (TESTER)", role: "tester", status: "idle", sessionId: "gpt-oss-01", cost: 0.08, actions: 89, x: 70, y: 30, color: "#3b82f6" },
   { id: "3", name: "CRUSH (ARCH)", role: "researcher", status: "working", sessionId: "grok-4-fast", cost: 0.42, actions: 2500, x: 45, y: 50, color: "#22c55e" },
   { id: "4", name: "HANK (BRAIN)", role: "manager", status: "working", sessionId: "minimax-m2.5", cost: 1.25, actions: 567, x: 10, y: 15, color: "#ef4444" },
 ];
-
-const PixelFish = ({ color, size = 48, flipped = false, agentName }: { color: string; size?: number; flipped?: boolean; agentName: string }) => (
-  <div className={`relative transition-all duration-1000 group cursor-pointer`} style={{ imageRendering: "pixelated", transform: flipped ? "scaleX(-1)" : "none" }}>
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M4 12C4 10 6 8 10 8C14 8 18 10 18 12C18 14 14 16 10 16C6 16 4 14 4 12Z" fill={color} />
-      <path d="M18 12L22 9V15L18 12Z" fill={color} />
-      <rect x="14" y="10" width="2" height="2" fill="white" />
-      <rect x="15" y="10.5" width="0.5" height="1" fill="black" />
-    </svg>
-    <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-black/80 text-[10px] px-2 py-0.5 rounded border border-white/20 text-white whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">
-      {agentName}
-    </div>
-  </div>
-);
 
 const OceanBackground = () => (
   <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -98,11 +180,7 @@ export default function ReefOffice() {
               animationDelay: `${Math.random() * 2}s`
             }}
           >
-            <PixelFish color={agent.color} agentName={agent.name} flipped={agent.x > 50} />
-            {/* Active Indicator */}
-            {agent.status === "working" && (
-              <div className="absolute -right-2 top-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white animate-ping" />
-            )}
+            <AgentSprite8Bit role={agent.role} status={agent.status} size={48} agentName={agent.name} />
           </div>
         ))}
 

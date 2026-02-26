@@ -2,81 +2,93 @@
 
 import { useRef, useEffect, useState } from "react";
 
-// Custom 8-bit Pixel Art SVG Components
-function PixelFish({ color, accentColor, facing = "right" }: { color: string; accentColor: string; facing?: "left" | "right" }) {
-  const scale = facing === "left" ? -1 : 1;
-  return (
-    <svg width="64" height="48" viewBox="0 0 64 48" style={{ transform: `scaleX(${scale})` }}>
-      {/* Body */}
-      <rect x="16" y="12" width="32" height="24" fill={color} />
-      {/* Head */}
-      <rect x="40" y="8" width="16" height="32" fill={color} />
-      {/* Tail */}
-      <rect x="4" y="16" width="16" height="16" fill={color} />
-      <rect x="0" y="20" width="8" height="8" fill={color} />
-      {/* Eye */}
-      <rect x="48" y="16" width="6" height="6" fill="white" />
-      <rect x="50" y="18" width="3" height="3" fill="black" />
-      {/* Stripes */}
-      <rect x="24" y="12" width="4" height="24" fill={accentColor} />
-      <rect x="32" y="12" width="4" height="24" fill={accentColor} />
-      {/* Fin */}
-      <rect x="28" y="4" width="8" height="8" fill={color} />
-    </svg>
-  );
+// Sprite paths mapping - sprites are in public/sprites/
+type SpriteState = "idle" | "working" | "walking";
+
+interface SpritePaths {
+  idle: string;
+  working?: string;
+  walking?: string;
 }
 
-function PixelTurtle({ color, accentColor }: { color: string; accentColor: string }) {
-  return (
-    <svg width="64" height="48" viewBox="0 0 64 48">
-      {/* Shell */}
-      <rect x="12" y="8" width="40" height="32" fill={color} />
-      <rect x="8" y="12" width="48" height="24" fill={color} />
-      {/* Shell pattern */}
-      <rect x="16" y="12" width="12" height="12" fill={accentColor} />
-      <rect x="36" y="12" width="12" height="12" fill={accentColor} />
-      <rect x="26" y="24" width="12" height="12" fill={accentColor} />
-      {/* Head */}
-      <rect x="52" y="16" width="10" height="16" fill={color} />
-      {/* Eye */}
-      <rect x="56" y="20" width="4" height="4" fill="white" />
-      <rect x="58" y="22" width="2" height="2" fill="black" />
-      {/* Flippers */}
-      <rect x="4" y="8" width="12" height="8" fill={color} />
-      <rect x="4" y="32" width="12" height="8" fill={color} />
-      <rect x="48" y="8" width="8" height="6" fill={color} />
-      <rect x="48" y="34" width="8" height="6" fill={color} />
-      {/* Tail */}
-      <rect x="0" y="22" width="6" height="4" fill={color} />
-    </svg>
-  );
-}
+const SPRITE_PATHS: Record<string, SpritePaths> = {
+  coder: {
+    idle: "/sprites/coder-idle.svg",
+    working: "/sprites/coder-working.svg",
+  },
+  researcher: {
+    idle: "/sprites/researcher-idle.svg",
+    working: "/sprites/researcher-working.svg",
+  },
+  tester: {
+    idle: "/sprites/tester-idle.svg",
+    working: "/sprites/tester-working.svg",
+  },
+  manager: {
+    idle: "/sprites/manager-idle.svg",
+    walking: "/sprites/manager-walking.svg",
+  },
+};
 
-function PixelOctopus({ color, accentColor }: { color: string; accentColor: string }) {
+const STATUS_ICONS: Record<string, string> = {
+  online: "/sprites/status-online.svg",
+  offline: "/sprites/status-offline.svg",
+  working: "/sprites/status-working.svg",
+};
+
+// Agent sprite component - uses external SVG sprites
+function SpriteRenderer({ 
+  role, 
+  status, 
+  size = 48 
+}: { 
+  role: "coder" | "researcher" | "tester" | "manager"; 
+  status: "working" | "idle" | "offline";
+  size?: number;
+}) {
+  // Determine which sprite to use based on role and status
+  const getSpritePath = () => {
+    const roleSprites = SPRITE_PATHS[role];
+    if (!roleSprites) return SPRITE_PATHS.coder.idle; // fallback
+    
+    // Manager uses "walking" when not idle, otherwise "idle"
+    if (role === "manager") {
+      return status === "idle" ? roleSprites.idle : (roleSprites.walking || roleSprites.idle);
+    }
+    // Other roles use "working" when working, "idle" otherwise
+    const activeStatus = status === "working" || status === "offline" ? "working" : "idle";
+    return roleSprites[activeStatus] || roleSprites.idle;
+  };
+
+  // Get status icon
+  const getStatusIcon = () => {
+    if (status === "offline") return STATUS_ICONS.offline;
+    if (status === "working") return STATUS_ICONS.working;
+    return STATUS_ICONS.online;
+  };
+
   return (
-    <svg width="64" height="56" viewBox="0 0 64 56">
-      {/* Head */}
-      <rect x="16" y="4" width="32" height="28" fill={color} />
-      <rect x="12" y="12" width="40" height="20" fill={color} />
-      {/* Eyes */}
-      <rect x="20" y="16" width="8" height="8" fill="white" />
-      <rect x="36" y="16" width="8" height="8" fill="white" />
-      <rect x="22" y="18" width="4" height="4" fill="black" />
-      <rect x="38" y="18" width="4" height="4" fill="black" />
-      {/* Angry eyebrows */}
-      <rect x="18" y="12" width="12" height="4" fill={accentColor} />
-      <rect x="34" y="12" width="12" height="4" fill={accentColor} />
-      {/* Tentacles */}
-      <rect x="12" y="32" width="8" height="20" fill={color} />
-      <rect x="22" y="32" width="8" height="24" fill={color} />
-      <rect x="34" y="32" width="8" height="24" fill={color} />
-      <rect x="44" y="32" width="8" height="20" fill={color} />
-      {/* Suckers */}
-      <rect x="14" y="44" width="4" height="4" fill={accentColor} />
-      <rect x="24" y="48" width="4" height="4" fill={accentColor} />
-      <rect x="36" y="48" width="4" height="4" fill={accentColor} />
-      <rect x="46" y="44" width="4" height="4" fill={accentColor} />
-    </svg>
+    <div className="relative" style={{ width: size, height: size }}>
+      {/* Status icon above agent (8x8 scaled to 16x16) */}
+      <img 
+        src={getStatusIcon()} 
+        alt={status}
+        className="absolute -top-2 -right-2 z-20"
+        style={{ width: 16, height: 16, imageRendering: "pixelated" }}
+      />
+      
+      {/* Agent sprite (16x16, scaled to desired size) */}
+      <img 
+        src={getSpritePath()} 
+        alt={`${role} ${status}`}
+        className="transition-all"
+        style={{ 
+          width: size, 
+          height: size, 
+          imageRendering: "pixelated",
+        }}
+      />
+    </div>
   );
 }
 
@@ -132,16 +144,13 @@ interface Agent {
   actions?: number;
   x: number;
   y: number;
-  color: string;
-  accentColor: string;
-  type: "nemo" | "dory" | "crush" | "hank";
 }
 
 const agents: Agent[] = [
-  { id: "1", name: "NEMO (CODER)", role: "coder", status: "working", sessionId: "glm-5-coder", cost: 0.15, actions: 124, x: 15, y: 55, color: "#f97316", accentColor: "#ffffff", type: "nemo" },
-  { id: "2", name: "DORY (TESTER)", role: "tester", status: "idle", sessionId: "glm-5-tester", cost: 0.08, actions: 89, x: 80, y: 30, color: "#3b82f6", accentColor: "#fbbf24", type: "dory" },
-  { id: "3", name: "CRUSH (RESEARCH)", role: "researcher", status: "working", sessionId: "glm-5-research", cost: 0.42, actions: 2500, x: 50, y: 50, color: "#22c55e", accentColor: "#166534", type: "crush" },
-  { id: "4", name: "HANK (MAIN)", role: "manager", status: "working", sessionId: "glm-5-main", cost: 1.25, actions: 567, x: 85, y: 65, color: "#ef4444", accentColor: "#7f1d1d", type: "hank" },
+  { id: "1", name: "NEMO (CODER)", role: "coder", status: "working", sessionId: "glm-5-coder", cost: 0.15, actions: 124, x: 15, y: 55 },
+  { id: "2", name: "DORY (TESTER)", role: "tester", status: "idle", sessionId: "glm-5-tester", cost: 0.08, actions: 89, x: 80, y: 30 },
+  { id: "3", name: "CRUSH (RESEARCH)", role: "researcher", status: "working", sessionId: "glm-5-research", cost: 0.42, actions: 2500, x: 50, y: 50 },
+  { id: "4", name: "HANK (MAIN)", role: "manager", status: "working", sessionId: "glm-5-main", cost: 1.25, actions: 567, x: 85, y: 65 },
 ];
 
 function AgentSprite({ agent, selected, onClick }: { agent: Agent; selected: boolean; onClick: () => void }) {
@@ -154,19 +163,6 @@ function AgentSprite({ agent, selected, onClick }: { agent: Agent; selected: boo
     return () => clearInterval(interval);
   }, [agent.x]);
   
-  const renderSprite = () => {
-    switch (agent.type) {
-      case "nemo":
-        return <PixelFish color={agent.color} accentColor={agent.accentColor} facing="right" />;
-      case "dory":
-        return <PixelFish color={agent.color} accentColor={agent.accentColor} facing="left" />;
-      case "crush":
-        return <PixelTurtle color={agent.color} accentColor={agent.accentColor} />;
-      case "hank":
-        return <PixelOctopus color={agent.color} accentColor={agent.accentColor} />;
-    }
-  };
-  
   return (
     <div
       onClick={onClick}
@@ -177,15 +173,8 @@ function AgentSprite({ agent, selected, onClick }: { agent: Agent; selected: boo
         transform: `translate(-50%, -50%) translateY(${hoverY}px)`,
       }}
     >
-      {renderSprite()}
-      
-      {/* Working indicator */}
-      {agent.status === "working" && (
-        <div 
-          className="absolute -top-2 -right-2 w-5 h-5 bg-green-500 rounded-full animate-pulse"
-          style={{ boxShadow: '0 0 10px #22c55e' }}
-        />
-      )}
+      {/* Use the new sprite-based AgentSprite component (renamed to SpriteRenderer to avoid conflict) */}
+      <SpriteRenderer role={agent.role} status={agent.status} size={48} />
       
       {/* Selection ring */}
       {selected && (
