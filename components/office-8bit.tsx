@@ -2,38 +2,40 @@
 
 import { useState, useEffect } from "react";
 
-// Sprite paths mapping - sprites are in public/sprites/
+// Sprite paths mapping - sprites are in public/sprites/reef/
+// New 8-bit sprites from the character sprite sheet
+// Each sprite has multiple frames for animation
 type SpriteState = "idle" | "working" | "walking";
 
 interface SpritePaths {
-  idle: string;
-  working?: string;
-  walking?: string;
+  idle: string[];
+  working?: string[];
+  walking?: string[];
 }
 
 const SPRITE_PATHS: Record<string, SpritePaths> = {
   coder: {
-    idle: "/sprites/coder-idle.svg",
-    working: "/sprites/coder-working.svg",
+    idle: ["/sprites/reef/coder-idle1.png", "/sprites/reef/coder-idle2.png"],
+    working: ["/sprites/reef/coder-working1.png", "/sprites/reef/coder-working2.png", "/sprites/reef/coder-working3.png", "/sprites/reef/coder-working4.png"],
   },
   researcher: {
-    idle: "/sprites/researcher-idle.svg",
-    working: "/sprites/researcher-working.svg",
+    idle: ["/sprites/reef/researcher-idle1.png", "/sprites/reef/researcher-idle2.png"],
+    working: ["/sprites/reef/researcher-working1.png", "/sprites/reef/researcher-working2.png", "/sprites/reef/researcher-working3.png", "/sprites/reef/researcher-working4.png"],
   },
   tester: {
-    idle: "/sprites/tester-idle.svg",
-    working: "/sprites/tester-working.svg",
+    idle: ["/sprites/reef/tester-idle1.png", "/sprites/reef/tester-idle2.png"],
+    working: ["/sprites/reef/tester-working1.png", "/sprites/reef/tester-working2.png", "/sprites/reef/tester-working3.png", "/sprites/reef/tester-working4.png"],
   },
   manager: {
-    idle: "/sprites/manager-idle.svg",
-    walking: "/sprites/manager-walking.svg",
+    idle: ["/sprites/reef/manager-idle1.png", "/sprites/reef/manager-idle2.png"],
+    walking: ["/sprites/reef/manager-walking1.png", "/sprites/reef/manager-walking2.png", "/sprites/reef/manager-walking3.png", "/sprites/reef/manager-walking4.png"],
   },
 };
 
 const STATUS_ICONS: Record<string, string> = {
-  online: "/sprites/status-online.svg",
-  offline: "/sprites/status-offline.svg",
-  working: "/sprites/status-working.svg",
+  online: "/sprites/reef/status-online.png",
+  offline: "/sprites/reef/status-offline.png",
+  working: "/sprites/reef/status-working.png",
 };
 
 interface Agent {
@@ -49,7 +51,7 @@ interface Agent {
   color: string;
 }
 
-// Agent sprite component for office-8bit - uses external SVG sprites
+// Agent sprite component for office-8bit - uses animated PNG sprites with CSS
 function AgentSprite8Bit({ 
   role, 
   status, 
@@ -61,8 +63,8 @@ function AgentSprite8Bit({
   size?: number;
   agentName: string;
 }) {
-  // Determine which sprite to use based on role and status
-  const getSpritePath = () => {
+  // Determine which sprite frames to use based on role and status
+  const getSpriteFrames = (): string[] => {
     const roleSprites = SPRITE_PATHS[role];
     if (!roleSprites) return SPRITE_PATHS.coder.idle;
     
@@ -75,6 +77,12 @@ function AgentSprite8Bit({
     return roleSprites[activeStatus] || roleSprites.idle;
   };
 
+  const spriteFrames = getSpriteFrames();
+  const frameCount = spriteFrames.length;
+  
+  // Animation duration based on frame count (0.5s per 4 frames)
+  const animDuration = frameCount > 2 ? `${0.5 * (4 / frameCount)}s` : '1s';
+
   // Get status icon
   const getStatusIcon = () => {
     if (status === "offline") return STATUS_ICONS.offline;
@@ -82,32 +90,59 @@ function AgentSprite8Bit({
     return STATUS_ICONS.online;
   };
 
+  // Generate keyframes for sprite animation
+  const spriteKeyframes = `
+    @keyframes sprite-anim-${role}-${status} {
+      0% { background-position: 0px 0px; }
+      100% { background-position: -${size * frameCount}px 0px; }
+    }
+  `;
+
   return (
-    <div className={`relative transition-all duration-1000 group cursor-pointer`} style={{ imageRendering: "pixelated" }}>
-      {/* Status icon above agent */}
-      <img 
-        src={getStatusIcon()} 
-        alt={status}
-        className="absolute -top-2 -right-2 z-20"
-        style={{ width: 16, height: 16, imageRendering: "pixelated" }}
-      />
-      
-      {/* Agent sprite */}
-      <img 
-        src={getSpritePath()} 
-        alt={`${role} ${status}`}
+    <>
+      <style>{spriteKeyframes}</style>
+      <div 
+        className={`relative transition-all duration-1000 group cursor-pointer`}
         style={{ 
-          width: size, 
-          height: size, 
           imageRendering: "pixelated",
+          width: size,
+          height: size,
+          backgroundImage: `url(${spriteFrames[0]})`,
+          backgroundSize: 'contain',
+          backgroundRepeat: 'no-repeat',
+          animation: status !== 'offline' ? `sprite-anim-${role}-${status} ${animDuration} steps(${frameCount}) infinite` : 'none',
         }}
-      />
-      
-      {/* Hover tooltip */}
-      <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-black/80 text-[10px] px-2 py-0.5 rounded border border-white/20 text-white whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">
-        {agentName}
+      >
+        {/* Multi-frame sprite as stacked images (fallback/visible) */}
+        <div className="relative w-full h-full">
+          {spriteFrames.map((frame, idx) => (
+            <img 
+              key={idx}
+              src={frame}
+              alt={`${role} ${status} frame ${idx + 1}`}
+              className="absolute top-0 left-0 w-full h-full"
+              style={{ 
+                imageRendering: "pixelated",
+                opacity: status === 'offline' ? 0.5 : 1,
+              }}
+            />
+          ))}
+        </div>
+        
+        {/* Status icon above agent */}
+        <img 
+          src={getStatusIcon()} 
+          alt={status}
+          className="absolute -top-2 -right-2 z-20"
+          style={{ width: 16, height: 16, imageRendering: "pixelated" }}
+        />
+        
+        {/* Hover tooltip */}
+        <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-black/80 text-[10px] px-2 py-0.5 rounded border border-white/20 text-white whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">
+          {agentName}
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 
